@@ -1,0 +1,19 @@
+
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+backend/scout_cache/
+backend/data/*.new.sqlite
+
+.env
+.env.*
+!.env.example
+
+# Extraídos automaticamente de runtime-assets.zip
+backend/data/market.sqlite
+backend/data/leagues/
+backend/.runtime-assets-ready
+frontend/dist/
+runtime-assets.new.zip
+*.extracting
