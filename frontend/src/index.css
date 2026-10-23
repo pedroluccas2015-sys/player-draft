@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+/* Green surfaces with white typography, shared by every screen. */
+@theme {
+  --color-zinc-950: #06281d;
+  --color-zinc-900: #103c2d;
+  --color-zinc-800: #22543f;
+  --color-zinc-700: #527d68;
+  --color-zinc-600: #87ad99;
+  --color-zinc-500: #a3c4b3;
+  --color-zinc-400: #bdd7ca;
+  --color-zinc-300: #d3e7dc;
+  --color-zinc-200: #e7f3ec;
+  --color-zinc-100: #f3faf6;
+}
+
+:root { color-scheme: dark; }
+
+
+body {
+  font-family: "Inter", sans-serif;
+  background: #021c14;
+  color: #f4f4f5;
+  overflow: hidden;
+}
+
+.cartesiano-bg {
+  background-image: radial-gradient(#19543e 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.btn-animate {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.btn-animate:active {
+  transform: scale(0.94);
+  filter: brightness(1.2);
+}
+
+.tab-entrance {
+  animation: tabSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes tabSlide {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.card-entrance {
+  animation: cardFade 0.5s ease-out forwards;
+}
+
+@keyframes cardFade {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dossier-entrance {
+  animation: dossierSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes dossierSlide {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-green {
+  0% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(52, 211, 153, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+  }
+}
+
+.pulse-active {
+  animation: pulse-green 2s infinite;
+}
+
+/* Remove o anel de foco padrão do navegador nos gráficos do Recharts */
+.recharts-wrapper,
+.recharts-surface {
+  outline: none !important;
+}
+
+/* Remove qualquer preenchimento invisível que possa receber foco */
+.recharts-wrapper *:focus {
+  outline: none !important;
+}
+
+/* Aplica scroll suave em todo o projeto ou especificamente no container do dossiê */
+html,
+.overflow-y-auto {
+  scroll-behavior: smooth !important;
+}
+
+/* Otimização para o scroll do Chrome/Edge */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =========================================================
+   CUSTOM SCROLLBAR (DARK MODE)
+   ========================================================= */
+
+/* Para Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #22543f transparent; /* Thumb (cinza) e Track (transparente) */
+}
+
+/* Para Chrome, Edge e Safari */
+::-webkit-scrollbar {
+  width: 8px; /* Espessura da barra vertical */
+  height: 8px; /* Espessura da barra horizontal (a da sua imagem) */
+}
+
+/* Fundo da barra (onde ela corre) */
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* A "peça" que você arrasta */
+::-webkit-scrollbar-thumb {
+  background: #22543f; /* Cor do Tailwind: zinc-800 */
+  border-radius: 10px; /* Deixa as pontas arredondadinhas */
+}
+
+/* Quando passa o mouse por cima da barra */
+::-webkit-scrollbar-thumb:hover {
+  background: #527d68; /* Cor do Tailwind: zinc-700 */
+}
