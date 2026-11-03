@@ -12,32 +12,39 @@ def api_scoreboard():
     if league not in ['bra.1','eng.1','ita.1','esp.1','ger.1','fra.1','por.1','uefa.champions','conmebol.libertadores','conmebol.sudamericana','usa.1']:
         return jsonify(error='Liga inválida.'),400
     
-    cache_key = f"scoreboard_v4_{league}"
+    cache_key = f"scoreboard_v5_{league}"
     cached_data = cache.get(cache_key)
     if cached_data is not None:
         print(f" Retornando Placar do cache para: {league}")
-        return jsonify(cached_data)
+        response = jsonify(cached_data)
+        response.headers['Cache-Control'] = 'no-store'
+        return response
 
-    hoje = datetime.now()
-    dias_atras = hoje - timedelta(days=45)
-    dias_frente = hoje + timedelta(days=10) 
-    
-    data_inicio = dias_atras.strftime('%Y%m%d')
-    data_fim = dias_frente.strftime('%Y%m%d')
+    hoje = datetime.now(timezone(timedelta(hours=-3)))
 
-    url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{league}/scoreboard?limit=100&dates={data_inicio}-{data_fim}"
-    
     try:
         # ESPN accepts calendar months; date ranges return HTTP 400.
         def get_month(offset):
             year = hoje.year + (hoje.month - 1 + offset) // 12
             month = (hoje.month - 1 + offset) % 12 + 1
+            month_key = f"scoreboard_calendar_v1_{league}_{year}{month:02d}"
+            stored = cache.get(month_key)
+            if stored is not None:
+                return stored
             res = SESSION.get(f"https://site.api.espn.com/apis/site/v2/sports/soccer/{league}/scoreboard?limit=1000&dates={year}{month:02d}", timeout=15)
             res.raise_for_status()
-            return res.json().get('events', [])
+            events = res.json()['events']
+            cache.set(month_key, events, expire=3600)
+            return events
         with ThreadPoolExecutor(max_workers=3) as pool:
             months = list(pool.map(get_month, [-1, 0, 1]))
         events_by_id = {event['id']: event for month in months for event in month}
+        # Daily scores override calendar snapshots, including kickoff and final whistles.
+        daily = SESSION.get(
+            f"https://site.api.espn.com/apis/site/v2/sports/soccer/{league}/scoreboard?limit=1000&dates={hoje:%Y%m%d}",
+            headers={'Cache-Control': 'no-cache'}, timeout=15)
+        daily.raise_for_status()
+        events_by_id.update({event['id']: event for event in daily.json()['events']})
         if True:
             data = {'events': list(events_by_id.values())}
             events = data.get('events', [])     
@@ -63,7 +70,9 @@ def api_scoreboard():
             past_and_live.sort(key=lambda x: x['date'], reverse=True)
             upcoming.sort(key=lambda x: x['date']) 
             
-            last_6_matches = past_and_live[:6]
+            live = [e for e in past_and_live if e.get('status', {}).get('type', {}).get('state') == 'in']
+            finished = [e for e in past_and_live if e not in live]
+            last_6_matches = live + finished[:max(0, 6 - len(live))]
             next_6_matches = upcoming[:6]
             
             def parse_matches(event_list):
@@ -140,7 +149,8 @@ def api_scoreboard():
                             'id': event['id'],
                             'date': formatted_date,
                             'status': status_desc,
-                            'short_status': 'AGENDADO' if state == 'pre' else ('ENCERRADO' if is_completed else status_desc[:30]),
+                            'is_live': state == 'in',
+                            'short_status': 'AGENDADO' if state == 'pre' else ('ENCERRADO' if is_completed else (event['status']['type'].get('shortDetail') or status_desc)[:40]),
                             'home_team': home['team']['displayName'] if home else 'Casa',
                             'home_score': home['score'] if home else '0',
                             'home_logo': home['team'].get('logo', ''),
@@ -161,16 +171,19 @@ def api_scoreboard():
             final_response = {
                 'league_name': data['leagues'][0]['name'] if data.get('leagues') else league, 
                 'matches': parse_matches(last_6_matches),    
+                'updated_at': datetime.now(timezone.utc).isoformat(),
                 'upcoming': parse_matches(next_6_matches)     
             }
             
             #ATRIBUIÇÃO DE CACHE DINÂMICO
-            ttl_seconds = 30 if has_live_match else 3600
+            ttl_seconds = 15
             cache.set(cache_key, final_response, expire=ttl_seconds)
             
-            print(f" Placar salvo! Jogo ao vivo rolando? {'SIM (Cache 30s)' if has_live_match else 'NÃO (Cache 1 hora)'}")
+            print(f" Placar salvo! Jogo ao vivo rolando? {has_live_match}")
             
-            return jsonify(final_response)
+            response = jsonify(final_response)
+            response.headers['Cache-Control'] = 'no-store'
+            return response
             
     except Exception as e:
         print(f"Erro na API da ESPN: {e}")
