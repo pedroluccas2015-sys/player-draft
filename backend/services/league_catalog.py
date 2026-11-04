@@ -5,6 +5,7 @@ from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 import json
 import threading
+from difflib import SequenceMatcher
 from config import SESSION, HEADERS, cache
 from services import market
 
@@ -102,24 +103,41 @@ def sync(country, force=False):
             return dict(previous,stale=True,notice='Última consulta preservada; atualização da fonte indisponível.')
         return dict(country=country,players=[],status='not_covered',notice=str(exc))
 
+def identity_name(value):
+    # Preserve letters that ASCII accent stripping would otherwise discard.
+    return market.normalize((value or '').translate(str.maketrans({
+        'ø':'o','Ø':'O','æ':'ae','Æ':'Ae','đ':'dj','Đ':'Dj','ð':'d','Ð':'D',
+        'ł':'l','Ł':'L','þ':'th','Þ':'Th','ß':'ss'})))
+
+
+def compatible_names(left, right, same_club=False):
+    left=identity_name(left).split()
+    right=identity_name(right).split()
+    if not left or not right:
+        return False
+    if set(left)<=set(right) or set(right)<=set(left):
+        return True
+    # Minor spelling variations require club confirmation and every token to agree.
+    return (same_club and len(left)==len(right)
+            and all(SequenceMatcher(None,a,b).ratio()>=0.8 for a,b in zip(left,right)))
+
+
 def dto(entry,country,index):
     p=entry['player']
     birth=datetime.fromtimestamp(p['dateOfBirthTimestamp'],timezone.utc).date().isoformat() if p.get('dateOfBirthTimestamp') else None
     matches=index.get((market.normalize(p.get('name')),birth),[]) if birth else []
     # Short/extended names vary between providers. Require corroborating identity.
     if not matches and birth:
-        name_tokens=set(market.normalize(p.get('name')).split())
         generic={'clube','club','de','do','da','dos','das','regatas','futebol','football','fc','ec','esporte'}
         club_tokens=set(market.normalize(entry['club']).split())-generic
         candidates=[]
         for offset in [0,-1,1]:
             candidate_birth=(date.fromisoformat(birth)+timedelta(days=offset)).isoformat()
             for row in index.get(('__birth__',candidate_birth),[]):
-                other_name=set(row['search_name'].split())
                 same_club=bool(club_tokens & (set(market.normalize(row['current_club_name']).split())-generic))
                 # A one-day discrepancy is accepted only with club confirmation.
-                if (row['club_country']==country and name_tokens and other_name
-                        and (name_tokens <= other_name or other_name <= name_tokens)
+                if (row['club_country']==country
+                        and compatible_names(p.get('name'),row['name'] if 'name' in row.keys() else row['search_name'],same_club)
                         and (offset==0 or same_club)):
                     candidates.append(row)
         matches=candidates
@@ -192,7 +210,14 @@ def search(filters):
             if p.get('tm_id'):
                 players.pop(f"tm:{p['tm_id']}",None)
             if matches(p,filters): players[p['id']]=p
-    rows=list(players.values())
+    # One card per confirmed identity, even if several squad rows use different IDs.
+    identities={}
+    for player in players.values():
+        key=('tm',player['tm_id']) if player.get('tm_id') else ('sofa',player['id'])
+        previous=identities.get(key)
+        if previous is None or (player.get('sofa_id') and not previous.get('sofa_id')):
+            identities[key]=player
+    rows=list(identities.values())
     sort=filters.get('sort')
     rows.sort(key=lambda p: ((p.get('age') is None,p.get('age') or 0,p['name']) if sort=='age_asc' else (p['name'],) if sort=='name' else (p.get('market_value_eur') is None,(p.get('market_value_eur') or 0)*(1 if sort=='value_asc' else -1),p['name'])))
     page=max(1,int(filters.get('page',1)))

@@ -105,3 +105,20 @@ class PlayerAliasTests(unittest.TestCase):
         entry=dict(player=dict(id=840219,name='Pedro Guilherme',dateOfBirthTimestamp=866678400),club='Flamengo')
         result=catalog.dto(entry,'Brazil',{('__birth__','1997-06-20'):[row]})
         self.assertNotIn('tm_id',result)
+
+
+class GeneralIdentityTests(unittest.TestCase):
+    def test_alias_rules_apply_to_all_names(self):
+        for left,right in [('Pedro Guilherme','Pedro'),('Wawa Christ','Christ Wawa'),
+                           ('Sondre Brunstad Fet','Sondre Fet'),('Jeppe Kjaer','Jeppe Kjær'),
+                           ('Andrej Đurić','Andrej Djuric')]:
+            with self.subTest(left=left):
+                self.assertTrue(catalog.compatible_names(left,right))
+
+    def test_minor_spelling_requires_club_confirmation(self):
+        self.assertTrue(catalog.compatible_names('Adam Lundqvist','Adam Lundkvist',True))
+        self.assertFalse(catalog.compatible_names('Adam Lundqvist','Adam Lundkvist',False))
+
+    def test_twins_and_unrelated_players_remain_separate(self):
+        self.assertFalse(catalog.compatible_names('Emil Konradsen Ceide','Mikkel Konradsen Ceide',True))
+        self.assertFalse(catalog.compatible_names('Jeppe Okkels','Viktor Bergh',True))

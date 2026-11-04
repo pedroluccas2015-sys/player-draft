@@ -130,6 +130,8 @@ class ScoutingTests(unittest.TestCase):
         timestamp=int(datetime(birth.year,birth.month,birth.day,tzinfo=timezone.utc).timestamp())
         catalogue=dict(country='Brazil',tournament_id=325,league='Brasileirão',updated_at='2026-11-04T00:00:00+00:00',
                        players=[dict(player=dict(id=99,name='Talento Um Completo',dateOfBirthTimestamp=timestamp,position='F',positionsDetailed=['ST']),club='Clube A')])
+        duplicate=dict(catalogue['players'][0],player=dict(catalogue['players'][0]['player'],id=100))
+        catalogue['players'].append(duplicate)
         with patch.object(league_catalog,'sync',return_value=catalogue):
             result=self.client.get('/api/scouting/search?country=Brazil&q=Talento%20Um&position=Centre-Forward')
         self.assertEqual(result.status_code,200)
