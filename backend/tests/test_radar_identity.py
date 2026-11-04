@@ -89,3 +89,17 @@ class RadarIdentityTests(unittest.TestCase):
         self.identity.return_value=dict(birth='2003-04-07')
         source=self.source([dict(id=1,name='Nome completo diferente',dateOfBirthTimestamp=1049673600)])
         self.assertEqual(radar_identity.resolve(self.context(),source)['id'],1)
+
+    def test_radar_endpoint_refuses_name_only_requests(self):
+        with patch('routes.club_routes.resolve_player') as global_search:
+            result=app.test_client().post('/api/radar/player',json={'player_name':'Kauan'})
+        self.assertEqual(result.status_code,400)
+        global_search.assert_not_called()
+
+    def test_radar_endpoint_resolves_by_match_team(self):
+        source=self.source([dict(id=1198003,name='Kauan',position='D')])
+        with patch('routes.club_routes.sofa',source),patch('routes.club_routes.build_dossier',return_value=dict(id=1198003,name='Kauan',stats=[])),patch('routes.club_routes.market.match_player',return_value=None),patch('routes.club_routes.resolve_player') as global_search:
+            result=app.test_client().post('/api/radar/player',json=dict(radar_context=self.context()))
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json['id'],1198003)
+        global_search.assert_not_called()

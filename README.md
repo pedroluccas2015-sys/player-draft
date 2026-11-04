@@ -11,7 +11,7 @@ Aplicativo de apoio ao departamento de futebol: observação por região, análi
 3. Abra `Iniciar-Player-Draft.cmd`. Ele cria `.venv` e instala as dependências do backend na primeira execução.
 4. Acesse **http://127.0.0.1:5000/**. Deixe a janela aberta; para parar, pressione Ctrl+C.
 
-A interface compilada, a base de mercado e os elencos consultados acompanham este repositório em `runtime-assets.zip`, extraído automaticamente na primeira execução com bibliotecas integradas ao Python. **Node.js não é necessário para executar essa versão pronta.** A primeira instalação e as consultas de dados precisam de internet. Não são exigidas chaves de API ou arquivo `.env` nesta versão.
+A interface compilada, a base de mercado e os elencos consultados acompanham este repositório em `runtime-assets.zip`, extraído automaticamente na primeira execução com bibliotecas integradas ao Python. A interface atualizada acompanha também `frontend/ready/` e é aplicada automaticamente na inicialização, mesmo quando os dados já foram extraídos de um pacote anterior. **Node.js não é necessário para executar essa versão pronta.** A primeira instalação e as consultas de dados precisam de internet. Não são exigidas chaves de API ou arquivo `.env` nesta versão.
 
 ### Instalação manual
 

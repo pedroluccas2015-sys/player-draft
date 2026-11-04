@@ -5,7 +5,7 @@ import shutil
 import zipfile
 
 
-def initialize(root=None):
+def initialize_data(root=None):
     root=Path(root or Path(__file__).resolve().parents[1]).resolve()
     archive=root/'runtime-assets.zip'
     if not archive.exists():
@@ -31,3 +31,17 @@ def initialize(root=None):
             temp.replace(target)
     marker.parent.mkdir(parents=True,exist_ok=True)
     marker.write_text(digest,encoding='ascii')
+
+
+def initialize(root=None):
+    root=Path(root or Path(__file__).resolve().parents[1]).resolve()
+    initialize_data(root)
+    # A data archive must not restore an outdated compiled UI.
+    ready=root/'frontend/ready'
+    if (ready/'index.html').is_file():
+        destination=root/'frontend/dist'
+        destination.mkdir(parents=True,exist_ok=True)
+        public=root/'frontend/public'
+        if public.is_dir():
+            shutil.copytree(public,destination,dirs_exist_ok=True)
+        shutil.copytree(ready,destination,dirs_exist_ok=True)

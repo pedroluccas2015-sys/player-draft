@@ -28,5 +28,23 @@ class BootstrapTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 initialize(root)
 
+    def test_ready_ui_overrides_old_archive_and_existing_marker(self):
+        with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as folder:
+            root=Path(folder)
+            with zipfile.ZipFile(root/'runtime-assets.zip','w') as bundle:
+                bundle.writestr('backend/data/market.sqlite',b'dataset')
+                bundle.writestr('frontend/dist/index.html','old name-only radar')
+            initialize(root)
+            ready=root/'frontend/ready'
+            (ready/'assets').mkdir(parents=True)
+            (ready/'index.html').write_text('new club-specific radar')
+            (ready/'assets/radar.js').write_text('/api/radar/player')
+            initialize(root)
+            self.assertEqual((root/'frontend/dist/index.html').read_text(),'new club-specific radar')
+            self.assertEqual((root/'frontend/dist/assets/radar.js').read_text(),'/api/radar/player')
+            (ready/'index.html').write_text('next version')
+            initialize(root)
+            self.assertEqual((root/'frontend/dist/index.html').read_text(),'next version')
+
 
 if __name__=='__main__': unittest.main()

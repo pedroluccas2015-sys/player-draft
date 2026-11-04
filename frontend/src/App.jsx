@@ -27,7 +27,7 @@ export default function App() {
   async function openPlayer(p) {
     const id=++requestId.current;setLoading(true);setError('');
     try {
-      const profile=await getJSON('/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p.radar_context?{radar_context:p.radar_context}:p.sofa_id?{player_id:p.sofa_id,league_id:p.league_id,league_name:p.league_name}:p.tm_id?{tm_id:p.tm_id}:{player_id:p.id,player_name:p.name})});
+      const profile=await getJSON(p.radar_context?'/api/radar/player':'/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p.radar_context?{radar_context:p.radar_context}:p.sofa_id?{player_id:p.sofa_id,league_id:p.league_id,league_name:p.league_name}:p.tm_id?{tm_id:p.tm_id}:{player_id:p.id,player_name:p.name})});
       if(id===requestId.current)setSelected(profile);
     } catch(e){if(id===requestId.current)setError(e.message);}
     finally{if(id===requestId.current)setLoading(false);}
@@ -45,7 +45,7 @@ export default function App() {
     let profile=p;
     if(!p.is_full_profile){
       const id=++requestId.current;setLoading(true);setError('');
-      try{profile=await getJSON('/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p.radar_context?{radar_context:p.radar_context}:p.sofa_id?{player_id:p.sofa_id,league_id:p.league_id,league_name:p.league_name}:p.tm_id?{tm_id:p.tm_id}:{player_id:p.id,player_name:p.name})});if(id!==requestId.current)return;}
+      try{profile=await getJSON(p.radar_context?'/api/radar/player':'/api/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p.radar_context?{radar_context:p.radar_context}:p.sofa_id?{player_id:p.sofa_id,league_id:p.league_id,league_name:p.league_name}:p.tm_id?{tm_id:p.tm_id}:{player_id:p.id,player_name:p.name})});if(id!==requestId.current)return;}
       catch(e){if(id===requestId.current)setError(e.message);return;}
       finally{if(id===requestId.current)setLoading(false);}
     }

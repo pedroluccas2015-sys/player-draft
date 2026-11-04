@@ -126,10 +126,13 @@ def build_dossier(p):
     return result
 
 
+@club_bp.post('/api/radar/player')
 @club_bp.post('/api/search')
 def player_search():
     data=request.get_json(silent=True) or {}
     tm=None
+    if request.path=='/api/radar/player' and not isinstance(data.get('radar_context'),dict):
+        return jsonify(error='Selecione o atleta pelo time da partida no radar.'),400
     try:
         if data.get('tm_id'):
             tm=market.profile(int(data['tm_id']))
