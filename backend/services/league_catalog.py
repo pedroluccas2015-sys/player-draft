@@ -1,7 +1,7 @@
 """Discover current club squads independently of Transfermarkt's market coverage."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 import json
 import threading
@@ -106,6 +106,23 @@ def dto(entry,country,index):
     p=entry['player']
     birth=datetime.fromtimestamp(p['dateOfBirthTimestamp'],timezone.utc).date().isoformat() if p.get('dateOfBirthTimestamp') else None
     matches=index.get((market.normalize(p.get('name')),birth),[]) if birth else []
+    # Short/extended names vary between providers. Require corroborating identity.
+    if not matches and birth:
+        name_tokens=set(market.normalize(p.get('name')).split())
+        generic={'clube','club','de','do','da','dos','das','regatas','futebol','football','fc','ec','esporte'}
+        club_tokens=set(market.normalize(entry['club']).split())-generic
+        candidates=[]
+        for offset in [0,-1,1]:
+            candidate_birth=(date.fromisoformat(birth)+timedelta(days=offset)).isoformat()
+            for row in index.get(('__birth__',candidate_birth),[]):
+                other_name=set(row['search_name'].split())
+                same_club=bool(club_tokens & (set(market.normalize(row['current_club_name']).split())-generic))
+                # A one-day discrepancy is accepted only with club confirmation.
+                if (row['club_country']==country and name_tokens and other_name
+                        and (name_tokens <= other_name or other_name <= name_tokens)
+                        and (offset==0 or same_club)):
+                    candidates.append(row)
+        matches=candidates
     tm=market.enrich(matches[0]) if len(matches)==1 else None
     raw=p.get('proposedMarketValueRaw') or {}
     value=raw.get('value') if raw.get('currency')=='EUR' else None
@@ -163,7 +180,10 @@ def search(filters):
     with closing(market.connect()) as db:
         index={}
         for row in db.execute('SELECT * FROM players'):
-            index.setdefault((row['search_name'],(row['date_of_birth'] or '')[:10]),[]).append(row)
+            birth=(row['date_of_birth'] or '')[:10]
+            index.setdefault((row['search_name'],birth),[]).append(row)
+            if birth:
+                index.setdefault(('__birth__',birth),[]).append(row)
     players={p['id']:p for p in base['players']}
     for catalogue in catalogues:
         for entry in catalogue['players']:

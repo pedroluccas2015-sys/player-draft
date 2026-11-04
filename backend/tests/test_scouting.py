@@ -121,6 +121,24 @@ class ScoutingTests(unittest.TestCase):
         with patch('routes.club_routes.sofa',side_effect=[{'results':[{'type':'player','entity':{'id':99,'team':{'sport':{'slug':'football'}}}}]}, {'player':{'id':99,'name':'Talento','dateOfBirthTimestamp':timestamp}}]):
             self.assertIsNone(resolve_player('Talento','2005-02-08'))
 
+    def test_scout_search_merges_alias_before_counting_and_paginating(self):
+        from datetime import timedelta
+        from services import league_catalog
+        with closing(market.connect()) as db:
+            birth=db.execute('SELECT date_of_birth FROM players WHERE player_id=1').fetchone()[0]
+        birth=date.fromisoformat(birth)-timedelta(days=1)
+        timestamp=int(datetime(birth.year,birth.month,birth.day,tzinfo=timezone.utc).timestamp())
+        catalogue=dict(country='Brazil',tournament_id=325,league='Brasileirão',updated_at='2026-11-04T00:00:00+00:00',
+                       players=[dict(player=dict(id=99,name='Talento Um Completo',dateOfBirthTimestamp=timestamp,position='F',positionsDetailed=['ST']),club='Clube A')])
+        with patch.object(league_catalog,'sync',return_value=catalogue):
+            result=self.client.get('/api/scouting/search?country=Brazil&q=Talento%20Um&position=Centre-Forward')
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.json['total'],1)
+        self.assertEqual(len(result.json['players']),1)
+        self.assertEqual(result.json['players'][0]['sofa_id'],99)
+        self.assertEqual(result.json['players'][0]['tm_id'],1)
+        self.assertEqual(result.json['players'][0]['market_value_eur'],5000000)
+
 
 if __name__=='__main__':
     unittest.main()

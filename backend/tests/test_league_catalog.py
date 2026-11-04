@@ -63,3 +63,45 @@ class LeagueCatalogTests(unittest.TestCase):
 
 
 if __name__=='__main__': unittest.main()
+
+class PlayerAliasTests(unittest.TestCase):
+    def dto(self, names, birth=866764800):
+        rows=[dict(search_name=name,club_country='Brazil',current_club_name='Clube de Regatas do Flamengo') for name in names]
+        index={('__birth__','1997-06-20'):rows}
+        entry=dict(player=dict(id=840219,name='Pedro Guilherme',dateOfBirthTimestamp=birth),club='Flamengo')
+        with patch.object(catalog.market,'enrich',return_value=dict(tm_id=432895,market_value_eur=20000000,position_detail='Centre-Forward')) as enrich:
+            result=catalog.dto(entry,'Brazil',index)
+        return result,enrich
+
+    def test_short_name_and_extended_name_share_identity(self):
+        result,enrich=self.dto(['pedro'])
+        self.assertEqual(result['tm_id'],432895)
+        self.assertEqual(result['sofa_id'],840219)
+        self.assertEqual(result['club'],'Flamengo')
+        enrich.assert_called_once()
+
+    def test_different_birth_date_is_not_joined(self):
+        result,enrich=self.dto(['pedro'],birth=866505600)
+        self.assertNotIn('tm_id',result)
+        enrich.assert_not_called()
+
+    def test_ambiguous_aliases_are_not_joined(self):
+        result,enrich=self.dto(['pedro','pedro guilherme'])
+        self.assertNotIn('tm_id',result)
+        enrich.assert_not_called()
+
+    def test_unrelated_names_are_not_joined_on_birth_alone(self):
+        result,enrich=self.dto(['paulo'])
+        self.assertNotIn('tm_id',result)
+        enrich.assert_not_called()
+
+    def test_one_day_discrepancy_requires_same_club(self):
+        result,enrich=self.dto(['pedro'],birth=866678400)
+        self.assertEqual(result['tm_id'],432895)
+        enrich.assert_called_once()
+
+    def test_one_day_discrepancy_with_different_club_is_not_joined(self):
+        row=dict(search_name='pedro',club_country='Brazil',current_club_name='Santos')
+        entry=dict(player=dict(id=840219,name='Pedro Guilherme',dateOfBirthTimestamp=866678400),club='Flamengo')
+        result=catalog.dto(entry,'Brazil',{('__birth__','1997-06-20'):[row]})
+        self.assertNotIn('tm_id',result)
