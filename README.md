@@ -209,3 +209,10 @@ Em `backend`:
 - Dados geográficos: world-atlas / Natural Earth, renderizados localmente.
 
 Código baseado no projeto original [DavideAlmeida2006/player-draft](https://github.com/DavideAlmeida2006/player-draft). Esta versão adapta o fluxo para scout de clubes e preserva os créditos do repositório de origem. Publicação do código no GitHub não hospeda automaticamente o backend nem transforma o aplicativo em um site acessível ao público.
+
+
+### Central da partida no Radar de ligas
+
+Clique em **Analisar partida · estatísticas e campo** no cartão do jogo. A central contém estatísticas comparadas, linha do tempo, reprodução de lances com coordenadas reais, elencos e estatísticas individuais. A aba de widgets incorpora escalações e pressão ofensiva oficiais do Sofascore quando o confronto e o horário são confirmados entre as fontes. Os mapas de calor são consultados pelo identificador exato da partida e do atleta escalado. Não são usados mapas de temporada como substitutos.
+
+A cobertura varia por jogo. Se o Sofascore estiver bloqueado ou sem dados, a análise ESPN continua disponível e o painel informa o que falta. O campo reproduz os lances publicados, não posições contínuas da bola e dos jogadores. A central atualiza a cada 30 segundos enquanto aberta.

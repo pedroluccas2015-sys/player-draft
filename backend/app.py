@@ -2,6 +2,7 @@ from pathlib import Path
 from flask import Flask, send_from_directory, jsonify
 
 from routes.team_routes import team_bp
+from routes.match_routes import match_bp
 from routes.club_routes import club_bp
 from routes.player_routes import player_bp
 from routes.proxy_routes import proxy_bp
@@ -12,6 +13,7 @@ FRONTEND_DIST = Path(__file__).resolve().parents[1] / 'frontend' / 'dist'
 app = Flask(__name__, static_folder=str(FRONTEND_DIST / 'assets'), static_url_path='/assets')
 
 app.register_blueprint(team_bp)
+app.register_blueprint(match_bp)
 app.register_blueprint(club_bp)
 app.register_blueprint(player_bp)
 app.register_blueprint(proxy_bp)
