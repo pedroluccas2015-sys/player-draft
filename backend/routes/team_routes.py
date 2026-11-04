@@ -12,7 +12,7 @@ def api_scoreboard():
     if league not in ['bra.1','eng.1','ita.1','esp.1','ger.1','fra.1','por.1','uefa.champions','conmebol.libertadores','conmebol.sudamericana','usa.1']:
         return jsonify(error='Liga inválida.'),400
     
-    cache_key = f"scoreboard_v5_{league}"
+    cache_key = f"scoreboard_v6_{league}"
     cached_data = cache.get(cache_key)
     if cached_data is not None:
         print(f" Retornando Placar do cache para: {league}")
@@ -99,6 +99,7 @@ def api_scoreboard():
                                 team_id = detail.get('team', {}).get('id')
                                 clock = detail.get('clock', {}).get('displayValue', '')
                               
+                                ath = {}
                                 player_name = "Desconhecido"
                                 if 'athletesInvolved' in detail and detail['athletesInvolved']:
                                     ath = detail['athletesInvolved'][0]
@@ -113,7 +114,16 @@ def api_scoreboard():
                                     if len(text_split) > 0:
                                         player_name = text_split[0].strip()
                                                                                         
-                                event_info = {"name": player_name, "time": clock}
+                                # Own goals are credited to the opposing side; use the athlete's team.
+                                athlete_team_id = str(ath.get('team', {}).get('id') or team_id or '')
+                                athlete_team = next((c for c in competitors if str(c['team']['id']) == athlete_team_id), None)
+                                event_info = {"name": player_name, "time": clock, 'radar_context': {
+                                    'display_name': player_name,
+                                    'full_name': ath.get('fullName') or ath.get('displayName') or player_name,
+                                    'espn_player_id': ath.get('id'), 'espn_team_id': athlete_team_id,
+                                    'club': athlete_team['team']['displayName'] if athlete_team else None,
+                                    'club_aliases': [athlete_team['team'].get(k) for k in ['name','shortDisplayName','abbreviation'] if athlete_team['team'].get(k)] if athlete_team else [],
+                                    'jersey': ath.get('jersey'), 'league': league, 'match_id': event['id']}}
                                 
                                 if is_scoring_play:
                                     is_own_goal = 'Own' in detail_text

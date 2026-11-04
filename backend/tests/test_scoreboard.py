@@ -51,3 +51,22 @@ class ScoreboardTests(unittest.TestCase):
 
     def test_invalid_league_is_rejected(self):
         self.assertEqual(self.client.get('/api/scoreboard?league=invalid').status_code, 400)
+
+    def test_scorer_keeps_match_club_and_full_name_separate_from_display(self):
+        match=event(7,'post')
+        match['competitions'][0]['details']=[dict(scoringPlay=True,team=dict(id='home'),clock=dict(displayValue="12'"),
+            athletesInvolved=[dict(id='338663',shortName='Kauan',displayName='Kauan Silva',fullName='Kauan Silva',team=dict(id='home'),jersey='21')])]
+        result=self.fetch([], [match])
+        scorer=result.json['matches'][0]['home_scorers'][0]
+        self.assertEqual(scorer['name'],'Kauan')
+        self.assertEqual(scorer['radar_context']['full_name'],'Kauan Silva')
+        self.assertEqual(scorer['radar_context']['club'],'home')
+        self.assertEqual(scorer['radar_context']['espn_player_id'],'338663')
+
+    def test_own_goal_preserves_athletes_actual_club(self):
+        match=event(7,'post')
+        match['competitions'][0]['details']=[dict(scoringPlay=True,type=dict(text='Own Goal'),team=dict(id='away'),
+            athletesInvolved=[dict(id='9',shortName='A. Paixão',fullName='Anderson Paixão',team=dict(id='home'))])]
+        result=self.fetch([], [match])
+        scorers=result.json['matches'][0]['home_scorers']+result.json['matches'][0]['away_scorers']
+        self.assertEqual(scorers[0]['radar_context']['club'],'home')

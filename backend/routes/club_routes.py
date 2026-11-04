@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 from flask import Blueprint, jsonify, request
 from config import SESSION, HEADERS, cache
-from services import market, league_catalog
+from services import market, league_catalog, radar_identity
 from services.sofascore_api import fetch_stats_parallel
 
 club_bp = Blueprint('club_scout', __name__)
@@ -135,7 +135,13 @@ def player_search():
             tm=market.profile(int(data['tm_id']))
             if not tm:
                 return jsonify(error='Atleta fora da cobertura Transfermarkt.'),404
-        if data.get('player_id'):
+        if data.get('radar_context'):
+            if not isinstance(data['radar_context'],dict):
+                return jsonify(error='Contexto do atleta inválido.'),400
+            p=radar_identity.resolve(data['radar_context'],sofa)
+            if not p:
+                return jsonify(error='Não foi possível confirmar este atleta no elenco do clube da partida. Nenhum dossiê de homônimo foi associado.'),404
+        elif data.get('player_id'):
             player_id=int(data['player_id'])
             p=sofa(f'/player/{player_id}').get('player')
         else:
