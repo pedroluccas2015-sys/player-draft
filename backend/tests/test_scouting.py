@@ -141,6 +141,22 @@ class ScoutingTests(unittest.TestCase):
         self.assertEqual(result.json['players'][0]['tm_id'],1)
         self.assertEqual(result.json['players'][0]['market_value_eur'],5000000)
 
+    def test_danilo_screenshot_returns_only_current_squad_card(self):
+        from services import league_catalog
+        with closing(market.connect()) as db:
+            db.execute("UPDATE players SET name='Danilo', search_name='danilo', date_of_birth='2001-04-29', current_club_name='S. A. F. Botafogo' WHERE player_id=1")
+            db.commit()
+        catalogue=dict(country='Brazil',tournament_id=325,league='Brasileirão',updated_at='2026-11-04T00:00:00+00:00',
+                       players=[dict(player=dict(id=1064039,name='Danilo Santos',dateOfBirthTimestamp=987638400,position='M',positionsDetailed=['DM']),club='Botafogo')])
+        with patch.object(league_catalog,'sync',return_value=catalogue):
+            for query in ['country=Brazil&q=Danilo','country=Brazil&sort=value_desc','country=Brazil&position=Centre-Forward']:
+                result=self.client.get('/api/scouting/search?'+query)
+                self.assertEqual(result.status_code,200)
+                rows=[p for p in result.json['players'] if 'Danilo' in p['name']]
+                self.assertFalse(any(p['id']=='tm:1' for p in result.json['players']))
+                if 'position=' not in query:
+                    self.assertEqual([p['name'] for p in rows],['Danilo Santos'])
+
 
 if __name__=='__main__':
     unittest.main()

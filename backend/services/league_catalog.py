@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 import threading
 from difflib import SequenceMatcher
+from collections import Counter, defaultdict
 from config import SESSION, HEADERS, cache
 from services import market
 
@@ -190,6 +191,41 @@ def metadata(base):
             row['coverage_status']='available' if row['has_data'] else 'not_covered'
     return base
 
+def club_identity(name):
+    # Legal/company prefixes vary by provider (Botafogo vs S. A. F. Botafogo).
+    generic={'clube','club','de','do','da','dos','das','regatas','futebol','football',
+             'sociedade','societa','esportiva','sportiva',
+             'esporte','association','associazione',
+             'fc','ec','sc','ac','cf','afc','saf','sa','spa','ltd','limited','the'}
+    return tuple(sorted(token for token in identity_name(name).split()
+                        if len(token)>1 and token not in generic))
+
+
+def market_only_players(players, catalogues, aliases=()):
+    """Covered clubs have one authoritative squad; unmatched market rows aren't extra players."""
+    covered={(c['country'],club_identity(entry['club']))
+             for c in catalogues for entry in c['players'] if club_identity(entry['club'])}
+    covered.update(aliases)
+    return {p['id']:p for p in players
+            if (p.get('club_country'),club_identity(p.get('club'))) not in covered}
+
+
+def confirmed_club_aliases(squad_players, market_rows):
+    # Learn provider club aliases from several independently matched identities.
+    # One transferred player cannot make an unrelated club count as covered.
+    votes=defaultdict(Counter)
+    for p in squad_players:
+        row=market_rows.get(p.get('tm_id'))
+        if row is not None and row['club_country']==p['club_country']:
+            votes[(p['club_country'],p['club'])][club_identity(row['current_club_name'])]+=1
+    proposed=defaultdict(set)
+    for (country,club),counts in votes.items():
+        alias,count=counts.most_common(1)[0]
+        if alias and count>=3 and count/sum(counts.values())>=0.6:
+            proposed[(country,alias)].add(club)
+    return {alias for alias,clubs in proposed.items() if len(clubs)==1}
+
+
 def search(filters):
     base=market.search(dict(filters,page=1),page_size=100000)
     countries=[filters['country']] if filters.get('country') else [r['country'] for r in base['metadata']['countries'] if not filters.get('region') or r['region']==filters['region']]
@@ -197,19 +233,26 @@ def search(filters):
     catalogues=[sync(c) for c in countries]
     with closing(market.connect()) as db:
         index={}
+        market_rows={}
         for row in db.execute('SELECT * FROM players'):
+            market_rows[row['player_id']]=row
             birth=(row['date_of_birth'] or '')[:10]
             index.setdefault((row['search_name'],birth),[]).append(row)
             if birth:
                 index.setdefault(('__birth__',birth),[]).append(row)
-    players={p['id']:p for p in base['players']}
+    squad_players=[]
     for catalogue in catalogues:
         for entry in catalogue['players']:
             p=dto(entry,catalogue['country'],index)
             p.update(league_id=catalogue.get('tournament_id'),league_name=catalogue.get('league'),squads_updated_at=catalogue.get('updated_at'))
-            if p.get('tm_id'):
-                players.pop(f"tm:{p['tm_id']}",None)
-            if matches(p,filters): players[p['id']]=p
+            squad_players.append(p)
+    aliases=confirmed_club_aliases(squad_players,market_rows)
+    players=market_only_players(base['players'],catalogues,aliases)
+    for p in squad_players:
+        if p.get('tm_id'):
+            players.pop(f"tm:{p['tm_id']}",None)
+        if matches(p,filters):
+            players[p['id']]=p
     # One card per confirmed identity, even if several squad rows use different IDs.
     identities={}
     for player in players.values():
@@ -224,5 +267,5 @@ def search(filters):
     base.update(players=rows[(page-1)*24:page*24],total=len(rows),page=page,page_size=24,
                 metadata=metadata(base['metadata']),leagues=[{k:v for k,v in c.items() if k!='players'} for c in catalogues],
                 coverage_status='available' if rows or any(c['players'] for c in catalogues) or base['coverage_status']=='available' else 'not_covered',
-                coverage_notice='Elencos consultados no Sofascore. Valores Transfermarkt de 06/07/2026 quando há correspondência confirmada; demais estimativas identificadas como Sofascore. Campos desconhecidos não atendem filtros específicos.')
+                coverage_notice='Clubes com elenco disponível mostram somente atletas desse elenco, sem cartões extras da base de mercado. Elencos consultados no Sofascore. Valores Transfermarkt de 06/07/2026 quando há correspondência confirmada; demais estimativas identificadas como Sofascore. Campos desconhecidos não atendem filtros específicos.')
     return base

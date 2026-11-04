@@ -122,3 +122,44 @@ class GeneralIdentityTests(unittest.TestCase):
     def test_twins_and_unrelated_players_remain_separate(self):
         self.assertFalse(catalog.compatible_names('Emil Konradsen Ceide','Mikkel Konradsen Ceide',True))
         self.assertFalse(catalog.compatible_names('Jeppe Okkels','Viktor Bergh',True))
+
+
+class AuthoritativeSquadTests(unittest.TestCase):
+    def catalogue(self):
+        return [dict(country='Brazil',players=[dict(club='Botafogo',player=dict(id=1064039,name='Danilo Santos'))])]
+
+    def test_danilo_market_card_is_removed_despite_conflicting_birth_dates(self):
+        players=[dict(id='tm:808509',name='Danilo',club='S. A. F. Botafogo',club_country='Brazil',date_of_birth='2001-04-29')]
+        self.assertEqual(catalog.market_only_players(players,self.catalogue()),{})
+
+    def test_different_nicknames_do_not_create_extra_cards_in_covered_club(self):
+        players=[dict(id='tm:1',name='Apelido diferente',club='Botafogo',club_country='Brazil')]
+        self.assertEqual(catalog.market_only_players(players,self.catalogue()),{})
+
+    def test_uncovered_clubs_keep_market_players(self):
+        players=[dict(id='tm:1',name='Danilo',club='Clube ainda sem elenco',club_country='Brazil')]
+        self.assertEqual(list(catalog.market_only_players(players,self.catalogue())),['tm:1'])
+
+    def test_homonymous_club_in_another_country_is_not_removed(self):
+        players=[dict(id='tm:1',club='Botafogo',club_country='Portugal')]
+        self.assertEqual(list(catalog.market_only_players(players,self.catalogue())),['tm:1'])
+
+    def test_regional_clubs_are_not_collapsed(self):
+        self.assertNotEqual(catalog.club_identity('Botafogo SP'),catalog.club_identity('Botafogo'))
+
+class ClubAliasEvidenceTests(unittest.TestCase):
+    def test_multiple_confirmed_players_link_different_club_names(self):
+        players=[dict(tm_id=i,club='Corinthians',club_country='Brazil') for i in range(4)]
+        rows={i:dict(club_country='Brazil',current_club_name='Sport Club Corinthians Paulista') for i in range(4)}
+        aliases=catalog.confirmed_club_aliases(players,rows)
+        self.assertIn(('Brazil',catalog.club_identity('Sport Club Corinthians Paulista')),aliases)
+
+    def test_one_transfer_does_not_remove_market_players_of_old_club(self):
+        players=[dict(tm_id=1,club='Clube novo',club_country='Brazil')]
+        rows={1:dict(club_country='Brazil',current_club_name='Clube antigo')}
+        self.assertEqual(catalog.confirmed_club_aliases(players,rows),set())
+
+    def test_alias_accepted_only_for_unique_authoritative_club(self):
+        players=[dict(tm_id=i,club='Clube A' if i<3 else 'Clube B',club_country='Brazil') for i in range(6)]
+        rows={i:dict(club_country='Brazil',current_club_name='Clube antigo') for i in range(6)}
+        self.assertEqual(catalog.confirmed_club_aliases(players,rows),set())
